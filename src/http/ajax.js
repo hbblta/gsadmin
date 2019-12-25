@@ -20,10 +20,14 @@ export default{
   },
   post(urlData,data) {
     let url = 'https://api.zjdandaotech.com/'+urlData
+    let token = 'a'
     return new Promise((resolve, reject) => {
       ajax({
         url: url,
         method: 'post',
+        header:{
+          authorization:token
+        },
         data: data
       })
         .then((res) => {
