@@ -13,6 +13,10 @@
         <template slot-scope="{ row, index }" slot="action">
           <Button type="primary" size="small" style="margin-right: 5px" @click="show(row.id)">修改</Button>
           <Button v-if="id != 1 && id != 3" type="error" size="small" style="margin-right: 5px" @click="del(row.id)">删除</Button>
+          <Button v-if="id != 1 && id != 3" type="info" size="small" style="margin-right: 5px" @click="topIndex(row.id,1)">上移</Button>
+          <Button v-if="id != 1 && id != 3" type="info" size="small" style="margin-right: 5px" @click="topIndex(row.id,2)">下移</Button>
+          <Button v-if="id != 1 && id != 3 && row.priority == 1" type="warning" size="small" style="margin-right: 5px" @click="topIndex(row.id,3)">置顶</Button>
+          <Button v-if="id != 1 && id != 3 && row.priority == 2"  size="small" style="margin-right: 5px" @click="topIndex(row.id,4)">取消置顶</Button>
         </template>
       </Table>
     </div>
@@ -50,6 +54,8 @@
                 render:(h, params) => {
                   if (params.row.type == 'text'){
                     return h('div','图文')
+                  }else if(params.row.type == 'link'){
+                    return h('div','链接')
                   }else{
                     return h('div','视频')
                   }
@@ -117,7 +123,45 @@
               })
             }
           })
-
+        },
+        topIndex(id,type){
+          if(type == 1){
+            this.ajax.post(`articles/${id}/up`,this.msgData,localStorage.getItem('token')).then((res) => {
+              if(res.code == 0){
+                this.$Message.success('设置成功')
+                this.ajax.get(`articles?categoryId=${this.$route.query.id}&from=0&size=999`).then((res) => {
+                  this.msgList = res.data.items
+                })
+              }
+            })
+          }else if(type == 2){
+            this.ajax.post(`articles/${id}/down`,this.msgData,localStorage.getItem('token')).then((res) => {
+              if(res.code == 0){
+                this.$Message.success('设置成功')
+                this.ajax.get(`articles?categoryId=${this.$route.query.id}&from=0&size=999`).then((res) => {
+                  this.msgList = res.data.items
+                })
+              }
+            })
+          }else if(type == 3){
+            this.ajax.post(`articles/${id}/promotion`,this.msgData,localStorage.getItem('token')).then((res) => {
+              if(res.code == 0){
+                this.$Message.success('设置成功')
+                this.ajax.get(`articles?categoryId=${this.$route.query.id}&from=0&size=999`).then((res) => {
+                  this.msgList = res.data.items
+                })
+              }
+            })
+          }else if(type == 4){
+            this.ajax.post(`articles/${id}/unpromotion`,this.msgData,localStorage.getItem('token')).then((res) => {
+              if(res.code == 0){
+                this.$Message.success('设置成功')
+                this.ajax.get(`articles?categoryId=${this.$route.query.id}&from=0&size=999`).then((res) => {
+                  this.msgList = res.data.items
+                })
+              }
+            })
+          }
         }
       }
     }

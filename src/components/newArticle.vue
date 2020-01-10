@@ -11,8 +11,8 @@
     <Select v-model="msgData.type"  style="width:250px;padding-left: 20px" >
       <Option  v-for="item in typeList" :value="item.type" :key="item.type">{{ item.name }}</Option>
     </Select>
-    <Divider orientation="left">{{msgData.type == 'text' ? '封面图片' : '内容视频/封面图片'}}</Divider>
-    <div >
+    <Divider orientation="left">{{msgData.type == 'text' ? '封面图片' : msgData.type == 'video' ?  '内容视频/封面图片' : '外部链接'}}</Divider>
+    <div>
       <Upload
         v-if="msgData.type == 'text'"
         type="drag"
@@ -26,12 +26,13 @@
         :data = "uploadData"
         :on-format-error = "handleFormatError"
         :before-upload="handleUpload"
+        :default-file-list="imgList"
         :on-remove = 'removeImg'
         :on-error="errorFn"
         :action="UploadUrl">
         <div  style="padding: 20px 0">
           <Icon type="ios-cloud-upload" size="52" style="color: #3399ff"></Icon>
-          <p>上传图片</p>
+          <p>上传封面图片</p>
         </div>
       </Upload>
       <Upload
@@ -47,6 +48,7 @@
         :on-success="successImg"
         :before-upload="handleUpload"
         :on-format-error = "handleFormatError"
+        :default-file-list="imgList"
         :on-remove = 'removeImg'
         :action="UploadUrl">
         <div  style="padding: 20px 0">
@@ -54,22 +56,23 @@
           <p>上传视频</p>
         </div>
       </Upload>
-            <Upload
-              ref="ImgVideo"
-              v-if="msgData.type == 'video'"
-              style="width:300px;padding-left: 20px"
-              :max-size='1024'
-              :accept="'image/*'"
-              :on-exceeded-size="handleMaxSize"
-              :data = "uploadDatas"
-              :before-upload="handleUploads"
-              :format="['jpg','jpeg','png', 'gif']"
-              :on-format-error = "handleFormatError"
-              :on-success="successImgs"
-              :on-error="errorFn"
-              :action="UploadUrls">
-              <Button icon="ios-cloud-upload-outline">上传视频封面图片</Button>
-            </Upload>
+      <Upload
+        ref="ImgVideo"
+        v-if="msgData.type == 'video' || msgData.type == 'link'"
+        style="width:300px;padding-left: 20px"
+        :max-size='1024'
+        :accept="'image/*'"
+        :on-exceeded-size="handleMaxSize"
+        :data = "uploadDatas"
+        :before-upload="handleUploads"
+        :format="['jpg','jpeg','png', 'gif']"
+        :on-format-error = "handleFormatError"
+        :on-success="successImgs"
+        :on-error="errorFn"
+        :action="UploadUrls">
+        <Button icon="ios-cloud-upload-outline">上传封面图片</Button>
+      </Upload>
+      <Input v-if="msgData.type == 'link'" v-model="msgData.links[0]" placeholder="请填写链接" style="width: 300px;padding-left: 20px;padding-bottom: 20px" />
     </div>
     <Divider orientation="left">文章标题</Divider>
     <Input v-model="msgData.title" placeholder="请填写标题" style="width: 300px;padding-left: 20px;padding-bottom: 20px" />
@@ -96,6 +99,10 @@
               {
                 name:'视频',
                 type : 'video'
+              },
+              {
+                name:'外链',
+                type : 'link'
               }
             ],
             token : '',
@@ -104,6 +111,7 @@
             titleText : '',
             model1: '',
             model1Two:'',
+            imgList : [],
             editor: null,
             info_: null,
             clientWidth : '',
@@ -121,6 +129,7 @@
               coverUrl : '',
               photos :[],
               videos : [],
+              links:[],
               type : 'text'
             }
           }
@@ -138,7 +147,7 @@
             console.log(error);
           },
           handleMaxSize (file) {
-            if(this.msgData.type == 'text'){
+            if(this.msgData.type == 'text'|| this.msgData.type == 'link'){
               this.$Notice.warning({
                 title: '文件大小超限',
                 desc: '文件  ' + file.name + ' 太大，上传文件大小不能超过1M.'
@@ -156,8 +165,8 @@
           },
           handleUpload (file) {
             let exts = ''
-            if(this.msgData.type == 'text'){
-              exts = 'png'
+            if(this.msgData.type == 'text' || this.msgData.type == 'link'){
+              exts = 'jpg'
             }else{
               exts = 'mp4'
             }
@@ -175,18 +184,17 @@
                 if(!this.handleMaxSizeType){
                   return
                 }
-                if(this.msgData.type == 'text'){
+                if(this.msgData.type == 'text' || this.msgData.type == 'link'){
                   this.$refs.textImg.post(file)
                 }else{
                   this.$refs.textVideo.post(file)
                 }
-
               },500)
             })
             return false;
           },
           handleUploads (file) {
-            this.ajax.gets('upload?ext=png',this.token).then((res) => {
+            this.ajax.gets('upload?ext=jpg',this.token).then((res) => {
               this.UploadUrls = res.requestUri
               this.uploadDatas.key = res.key
               this.uploadDatas.bucket = res.bucket
@@ -218,11 +226,18 @@
             console.log(img);
           },
           successImg(img){
+            this.imgList = []
             if(this.msgData.type == 'text'){
               this.msgData.photos[0] = this.DataUrl
             }else{
               this.msgData.videos[0] = this.DataUrl
             }
+            let imgData = {
+              name : this.DataUrl,
+              url : this.DataUrl
+            }
+            this.imgList.push(imgData)
+
           },
           nowTitleTwo(id){
             this.msgData.categoryId = id
@@ -235,8 +250,14 @@
             }
           },
           setUp(){
-            if(this.categoryId == 0){
+
+            if(this.msgData.categoryId == 0){
               this.$Message.warning('请填写完整');
+              return
+            }
+            if(this.msgData.title == 0){
+              this.$Message.warning('请填写完整');
+              return
             }
               this.ajax.post('articles',this.msgData,this.token).then((res) => {
                 if(res.code == 0){
@@ -247,6 +268,7 @@
                     coverUrl : '',
                     photos : [],
                     videos : [],
+                    links:[],
                     type : ''
                   }
                   this.$Message.success('创建成功')
@@ -307,11 +329,10 @@
                   // console.log(result.data[0].url)
                   //insertImg()为插入图片的函数
                   //循环插入图片
-                  // for (let i = 0; i < 1; i++) {
-                  console.log(result)
-                  let url = "https://img.zjdandaotech.com/"+result.data[0].key
+                   for (let i = 0; i < result.data.length; i++) {
+                  let url = "https://img.zjdandaotech.com/"+result.data[i].key
                   insertImg(url)
-                  // }
+                   }
                 }
               }
               this.editor.customConfig.onchange = (html) => {

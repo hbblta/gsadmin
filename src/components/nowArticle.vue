@@ -11,10 +11,10 @@
     <Select v-model="msgData.type"   style="width:250px;padding-left: 20px" >
       <Option  v-for="item in typeList" :value="item.type" :key="item.type">{{ item.name }}</Option>
     </Select>
-    <Divider orientation="left">{{msgData.type == 'text' ? '封面图片' : '内容视频/封面图片'}}</Divider>
+    <Divider orientation="left">{{msgData.type == 'text' ? '封面图片' : msgData.type == 'video' ?  '内容视频/封面图片' : '外部链接'}}</Divider>
     <div >
       <Upload
-        v-if="msgData.type == 'text'"
+        v-if="msgData.type == 'text'  || msgData.type == 'link'"
         type="drag"
         ref="textImg"
         style="padding-left: 20px"
@@ -23,6 +23,7 @@
         :max-size='1024'
         :data = "uploadData"
         :accept="'image/*'"
+        :default-file-list="imgList"
         :before-upload="handleUpload"
         :on-exceeded-size="handleMaxSize"
         :on-format-error = "handleFormatError"
@@ -30,7 +31,7 @@
         :action="UploadUrl">
         <div  style="padding: 20px 0">
           <Icon type="ios-cloud-upload" size="52" style="color: #3399ff"></Icon>
-          <p>上传图片</p>
+          <p>上传封面图片</p>
         </div>
       </Upload>
       <Upload
@@ -43,6 +44,7 @@
         :max-size='102400'
         :accept="'video/*'"
         :on-success="successImg"
+        :default-file-list="imgList"
         :on-exceeded-size="handleMaxSize"
         :before-upload="handleUpload"
         :on-format-error = "handleFormatError"
@@ -68,12 +70,13 @@
         :action="UploadUrls">
         <Button icon="ios-cloud-upload-outline">上传视频封面图片</Button>
       </Upload>
+      <Input v-if="msgData.type == 'link'" v-model="msgData.links[0]" placeholder="请填写链接" style="width: 300px;padding-left: 20px;padding-bottom: 20px" />
     </div>
     <Divider orientation="left">文章标题</Divider>
     <Input v-model="msgData.title" placeholder="请填写标题" style="width: 300px;padding-left: 20px;padding-bottom: 20px" />
     <div style="padding: 20px"  id="editor" :style="{width:clientWidth}">
     </div>
-    <Button type="primary" @click="setUp" style="position: relative;left: 45%;top: 20px">创建文章</Button>
+    <Button type="primary" @click="setUp" style="position: relative;left: 45%;top: 20px">修改文章</Button>
   </div>
 </template>
 
@@ -90,10 +93,13 @@
             name:'图文',
             type : 'text'
           },
-
           {
             name:'视频',
             type : 'video'
+          },
+          {
+            name:'外链',
+            type : 'link'
           }
         ],
         token : '',
@@ -112,6 +118,10 @@
         DataUrls : '',
         DataUrl : '',
         handleMaxSizeType : true,
+        imgList : [{
+          name : '',
+          url : ''
+        }],
         msgData:{
           categoryId : 0,
           title : '',
@@ -119,7 +129,8 @@
           coverUrl : '',
           photos :[],
           videos : [],
-          type : 'text'
+          links:[],
+          type : 'text',
         }
       }
     },
@@ -135,15 +146,27 @@
           this.msgData.body =  res.data.body
           this.msgData.photos =  res.data.photos
           this.msgData.type =  res.data.type
-        }else{
+          this.imgList[0].name = res.data.photos[0]
+          this.imgList[0].url = res.data.photos[0]
+        }else if(res.data.type == 'video'){
           this.msgData.categoryId =  res.data.categoryId
           this.msgData.title =  res.data.title
           this.msgData.body =  res.data.body
           this.msgData.coverUrl =  res.data.coverUrl
-          this.msgData.type =  res.data.coverUrl
+          this.msgData.type =  res.data.type
           this.msgData.videos =  res.data.videos
+          this.imgList[0].name = res.data.videos[0]
+          this.imgList[0].url = res.data.videos[0]
+        }else{
+          this.msgData.coverUrl =  res.data.coverUrl
+          this.msgData.links[0] = res.data.links[0]
+          this.msgData.categoryId =  res.data.categoryId
+          this.msgData.title =  res.data.title
+          this.msgData.body =  res.data.body
+          this.msgData.type =  res.data.type
+          this.imgList[0].name = res.data.coverUrl
+          this.imgList[0].url = res.data.coverUrl
         }
-
         this.editor.txt.html(res.data.body);
       })
       this.clientWidth = `${document.documentElement.clientWidth -240 }`+'px';
@@ -154,7 +177,7 @@
         console.log(error);
       },
       handleMaxSize (file) {
-        if(this.msgData.type == 'text'){
+        if(this.msgData.type == 'text' || this.msgData.type == 'link'){
           this.$Notice.warning({
             title: '文件大小超限',
             desc: '文件  ' + file.name + ' 太大，上传文件大小不能超过1M.'
@@ -175,8 +198,8 @@
       },
       handleUpload (file) {
         let exts = ''
-        if(this.msgData.type == 'text'){
-          exts = 'png'
+        if(this.msgData.type == 'text' || this.msgData.type == 'link'){
+          exts = 'jpg'
         }else{
           exts = 'mp4'
         }
@@ -193,7 +216,7 @@
             if(!this.handleMaxSizeType){
               return
             }
-            if(this.msgData.type == 'text'){
+            if(this.msgData.type == 'text' || this.msgData.type == 'link'){
               this.$refs.textImg.post(file)
             }else{
               this.$refs.textVideo.post(file)
@@ -204,7 +227,7 @@
         return false;
       },
       handleUploads (file) {
-        this.ajax.gets('upload?ext=png',this.token).then((res) => {
+        this.ajax.gets('upload?ext=jpg',this.token).then((res) => {
           this.UploadUrls = res.requestUri
           this.uploadDatas.key = res.key
           this.uploadDatas.bucket = res.bucket
@@ -236,27 +259,45 @@
         console.log(img);
       },
       successImg(img){
+        this.imgList =  [{
+          name : '',
+          url : ''
+        }]
         if(this.msgData.type == 'text'){
           this.msgData.photos[0] = this.DataUrl
+        }else if(this.msgData.type == 'link'){
+          this.msgData.coverUrl = this.DataUrl
         }else{
           this.msgData.videos[0] = this.DataUrl
         }
+        this.imgList[0].name = this.DataUrl
+        this.imgList[0].url = this.DataUrl
       },
       nowTitleTwo(id){
         this.msgData.categoryId = id
       },
       isClear(val) {
         // 触发清除文本域内容
+        console.log(val);
         if (val) {
           this.editor.txt.clear()
           this.info_ = null
         }
       },
       setUp(){
-        if(this.categoryId == 0){
-          this.$Message.warning('请填写完整');
+        console.log(this.msgData);
+        if(this.editor.txt.editor.$textElem[0].innerHTML == '<p><br></p>'){
+          this.msgData.body = ''
         }
-        this.ajax.post('articles',this.msgData,this.token).then((res) => {
+        if(this.msgData.categoryId == 0){
+          this.$Message.warning('请填写完整');
+          return
+        }
+        if(this.msgData.title == 0){
+          this.$Message.warning('请填写完整');
+          return
+        }
+        this.ajax.put('articles/'+this.$route.query.id,this.msgData,this.token).then((res) => {
           if(res.code == 0){
             // this.msgData = {
             //   categoryId : 0,
@@ -267,11 +308,12 @@
             //   videos : [],
             //   type : ''
             // }
-            this.$Message.success('创建成功')
+            // this.$router.push({path: 'articleList'})
+            this.$Message.success('修改成功')
           }
         })
-        this.files = null;
-        this.file = null;
+        // this.files = null;
+        // this.file = null;
       },
       initEdiot(){
         this.editor = new E('#editor')
@@ -325,15 +367,15 @@
             // console.log(result.data[0].url)
             //insertImg()为插入图片的函数
             //循环插入图片
-            // for (let i = 0; i < 1; i++) {
-            console.log(result)
-            let url = "https://img.zjdandaotech.com/"+result.data[0].key
-            insertImg(url)
-            // }
+            for (let i = 0; i < result.data.length; i++) {
+              let url = "https://img.zjdandaotech.com/"+result.data[i].key
+              insertImg(url)
+            }
           }
         }
         this.editor.customConfig.onchange = (html) => {
           this.msgData.body = html
+          console.log(html);
         }
         // 创建富文本编辑器
         this.editor.create()
